@@ -5,6 +5,8 @@ describe OmniContacts::Importer::Gmail do
 
   let(:gmail) { OmniContacts::Importer::Gmail.new({}, "client_id", "client_secret") }
 
+  let(:gmail_with_scope_args) { OmniContacts::Importer::Gmail.new({}, "client_id", "client_secret", {scope: "https://www.google.com/m8/feeds https://www.googleapis.com/auth/userinfo#email https://www.googleapis.com/auth/contacts.readonly"}) }
+  
   let(:self_response) {
     '{
       "id":"16482944006464829443",
@@ -67,9 +69,11 @@ describe OmniContacts::Importer::Gmail do
               "gd$givenName":{"$t":"Edward"},
               "gd$familyName":{"$t":"Bennet"}
             },
+            "gd$organization":[{"rel":"http://schemas.google.com/g/2005#other","gd$orgName":{"$t":"Google"},"gd$orgTitle":{"$t":"Master Developer"}}],
             "gContact$birthday":{"when":"1954-07-02"},
             "gContact$relation":{"rel":"father"},
             "gContact$gender":{"value":"male"},
+            "gContact$event":[{"rel":"anniversary","gd$when":{"startTime":"1983-04-21"}},{"label":"New Job","gd$when":{"startTime":"2014-12-01"}}],
             "gd$email":[{"rel":"http://schemas.google.com/g/2005#other","address":"bennet@gmail.com","primary":"true"}],
             "gContact$groupMembershipInfo":[{"deleted":"false","href":"http://www.google.com/m8/feeds/groups/logged_in_user%40gmail.com/base/6"}],
             "gd$structuredPostalAddress":[{"rel":"http://schemas.google.com/g/2005#home","gd$formattedAddress":{"$t":"1313 Trashview Court\nApt. 13\nNowheresville, OK 66666"},"gd$street":{"$t":"1313 Trashview Court\nApt. 13"},"gd$postcode":{"$t":"66666"},"gd$country":{"code":"VA","$t":"Valoran"},"gd$city":{"$t":"Nowheresville"},"gd$region":{"$t":"OK"}}],
@@ -108,6 +112,7 @@ describe OmniContacts::Importer::Gmail do
 
     before(:each) do
       gmail.instance_variable_set(:@env, {})
+      gmail_with_scope_args.instance_variable_set(:@env, {})
     end
 
     it "should request the contacts by specifying version and code in the http headers" do
@@ -122,6 +127,9 @@ describe OmniContacts::Importer::Gmail do
         contacts_as_json
       end
       gmail.fetch_contacts_using_access_token token, token_type
+      
+      gmail.scope.should eq "https://www.google.com/m8/feeds https://www.googleapis.com/auth/userinfo#email https://www.googleapis.com/auth/userinfo.profile"
+      gmail_with_scope_args.scope.should eq "https://www.google.com/m8/feeds https://www.googleapis.com/auth/userinfo#email https://www.googleapis.com/auth/contacts.readonly"
     end
 
     it "should correctly parse id, name, email, gender, birthday, profile picture and relation for 1st contact" do
@@ -139,6 +147,7 @@ describe OmniContacts::Importer::Gmail do
       result.first[:birthday].should eq({:day=>02, :month=>07, :year=>1954})
       result.first[:relation].should eq('father')
       result.first[:profile_picture].should eq("https://profiles.google.com/s2/photos/profile/bennet")
+      result.first[:dates][0][:name].should eq("anniversary")
     end
 
     it "should correctly parse id, name, email, gender, birthday, profile picture, snailmail address, phone and relation for 2nd contact" do
